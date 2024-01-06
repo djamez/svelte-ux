@@ -102,6 +102,16 @@ export function getDayOfWeekName(weekStartsOn: DayOfWeek, locales: string) {
   return formatter.format(date);
 }
 
+export function getWeekStartsOnFromIntl(locales?: string): DayOfWeek {
+  if (!locales) {
+    return DayOfWeek.Sunday;
+  }
+
+  const info = new Intl.Locale(locales);
+  // @ts-ignore
+  return (info.weekInfo.firstDay ?? 0) % 7; // (in Intl, sunday is 7 not 0, so we need to mod 7)
+}
+
 export function getPeriodTypeName(periodType: PeriodType, options: FormatDateOptions = {}) {
   const { locales, dictionaryDate: dico } = getFormatDate(options);
 
@@ -772,6 +782,7 @@ export type CustomIntlDateTimeFormatOptions =
 export type FormatDateOptions = {
   locales?: string | undefined;
   baseParsing?: string;
+  /** will be inferred from your locales */
   weekStartsOn?: DayOfWeek;
   variant?: DateFormatVariant;
   custom?: CustomIntlDateTimeFormatOptions;

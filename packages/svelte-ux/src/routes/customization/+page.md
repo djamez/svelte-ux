@@ -84,7 +84,6 @@ settings({
     dates: {
       // This is the default, but you can override it here for your app
       locales: 'en',
-      weekStartsOn: DayOfWeek.Sunday,
 
       presets: {
         day: {
@@ -100,6 +99,7 @@ settings({
           one: 'st',
           two: 'nd',
           few: 'rd',
+          other: 'th',
         },
       },
 

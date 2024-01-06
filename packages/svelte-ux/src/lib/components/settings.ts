@@ -9,6 +9,7 @@ import {
   type CustomIntlDateTimeFormatOptions,
   type OrdinalSuffixes,
   DateToken,
+  getWeekStartsOnFromIntl,
 } from '$lib/utils/date';
 import type { DictionaryMessages, DictionaryMessagesOptions } from '$lib/utils/dictionary';
 import { createThemeStore, type ThemeStore } from '$lib/stores/themeStore';
@@ -61,10 +62,14 @@ export function settings(settings: SettingsInput) {
   });
 }
 
+function defaults() {}
+
 export function getSettings(): Settings {
   // in a try/catch to be able to test wo svelte components
   try {
-    return getContext<Settings>(settingsKey) ?? {};
+    const tt = getContext<Settings>(settingsKey) ?? {};
+    console.log(`tt`, tt);
+    return tt;
   } catch (error) {
     return { currentTheme: createThemeStore({ light: ['light'], dark: ['dark'] }) };
   }
@@ -95,9 +100,11 @@ export function getFormatDate(options?: FormatDateOptions) {
 
   const settings = getSettings();
 
-  const baseParsing = options?.baseParsing ?? settings.formats?.dates?.baseParsing ?? 'MM/dd/yyyy';
+  const baseParsing = options?.baseParsing ?? settings.formats?.dates?.baseParsing ?? 'yyyy-MM-dd';
 
   const custom = options?.custom ?? '';
+
+  const locales = options?.locales ?? settings.formats?.dates?.locales ?? 'en';
 
   let toRet: {
     locales: string;
@@ -117,10 +124,12 @@ export function getFormatDate(options?: FormatDateOptions) {
     ordinalSuffixes: Record<string, OrdinalSuffixes>;
     dictionaryDate: DictionaryMessages['Date'];
   } = {
-    locales: options?.locales ?? settings.formats?.dates?.locales ?? 'en',
+    locales,
     baseParsing,
     weekStartsOn:
-      options?.weekStartsOn ?? settings.formats?.dates?.weekStartsOn ?? DayOfWeek.Sunday,
+      options?.weekStartsOn ??
+      settings.formats?.dates?.weekStartsOn ??
+      getWeekStartsOnFromIntl(locales),
     variant,
     custom,
 
