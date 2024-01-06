@@ -35,11 +35,9 @@ const settingsKey = Symbol();
 export function settings(input: SettingsInput) {
   setContext(settingsKey, {
     formats: {
-      numbers: internalGetFormatNumber('currency'),
-      dates: internalGetFormatDate(input?.formats?.dates),
+      numbers: input?.formats?.numbers, // TODO: store everything from input...
+      dates: input?.formats?.dates ?? dateDefaults(),
     },
-    getFormatNumber: internalGetFormatNumber,
-    getFormatDate: internalGetFormatDate(input?.formats?.dates),
     classes: input.classes,
     ...themeDefaults({ themes: input.themes, currentTheme: input.currentTheme }),
     ...internalGetDictionary(input),
