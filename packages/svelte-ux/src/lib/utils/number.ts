@@ -1,4 +1,4 @@
-import { getFormatNumber } from '$lib/components/settings';
+import { getSettings } from '$lib/components';
 
 export type FormatNumberStyle =
   | 'decimal' // from Intl.NumberFormat options.style NumberFormatOptions
@@ -32,7 +32,7 @@ export function formatNumber(number: number | null | undefined, options: FormatN
     return `${number}`;
   }
 
-  const defaults = getFormatNumber(options.style);
+  const defaults = getSettings().getFormatNumber(options.style);
 
   const formatter = Intl.NumberFormat(options.locales ?? defaults.locales ?? undefined, {
     // Let's always starts with all defaults

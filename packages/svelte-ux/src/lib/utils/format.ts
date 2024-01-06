@@ -1,6 +1,6 @@
 import { isFunction } from 'lodash-es';
 
-import { formatDate, PeriodType, type FormatDateOptions } from './date';
+import { formatDate, PeriodType, type SettingsDateInput } from './date';
 import { formatNumber } from './number';
 import type { FormatNumberOptions, FormatNumberStyle } from './number';
 
@@ -15,7 +15,7 @@ export type FormatType =
 export function format(
   value: null | undefined,
   format?: FormatNumberStyle | PeriodType,
-  extraFuncArgs?: FormatNumberOptions | FormatDateOptions
+  extraFuncArgs?: FormatNumberOptions | SettingsDateInput
 ): string;
 export function format(
   value: number,
@@ -25,7 +25,7 @@ export function format(
 export function format(
   value: string | Date,
   format?: PeriodType,
-  extraFuncArgs?: FormatDateOptions
+  extraFuncArgs?: SettingsDateInput
 ): string;
 export function format(value: any, format?: FormatType, ...extraFuncArgs: any[]): any {
   let formattedValue = value ?? ''; // Do not render `null`

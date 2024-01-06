@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { PeriodType, getDateFuncsByPeriodType, type FormatDateOptions } from '../utils/date';
+  import { PeriodType, getDateFuncsByPeriodType } from '../utils/date';
   import type { DateRange } from '../utils/dateRange';
 
   import { format as format_ux } from '../utils';

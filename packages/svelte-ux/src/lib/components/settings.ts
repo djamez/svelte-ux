@@ -1,9 +1,8 @@
 import type { FormatNumberOptions, FormatNumberStyle } from '$lib/utils/number';
 import { getContext, setContext } from 'svelte';
 import type { ComponentClasses } from './theme';
-import type { Prettify } from '$lib/types/typeHelpers';
 import {
-  type FormatDateOptions,
+  type SettingsDateInput,
   DayOfWeek,
   type DateFormatVariant,
   type CustomIntlDateTimeFormatOptions,
@@ -11,24 +10,67 @@ import {
   DateToken,
   getWeekStartsOnFromIntl,
 } from '$lib/utils/date';
-import type { DictionaryMessages, DictionaryMessagesOptions } from '$lib/utils/dictionary';
+
 import { createThemeStore, type ThemeStore } from '$lib/stores/themeStore';
 
 type ExcludeNone<T> = T extends 'none' ? never : T;
 export type SettingsInput = {
   formats?: {
-    numbers?: Prettify<
-      {
-        defaults?: FormatNumberOptions;
-      } & {
-        [key in ExcludeNone<FormatNumberStyle>]?: FormatNumberOptions;
-      }
-    >;
-    dates?: FormatDateOptions;
+    numbers?: SettingsNumbersInput;
+    dates?: SettingsDateInput;
   };
-  dictionary?: DictionaryMessagesOptions;
   classes?: ComponentClasses;
-  /** A list of the available themes */
+} & SettingsDictionaryInput &
+  SettingsThemeInput;
+
+export type Settings = {
+  formats?: {
+    numbers?: SettingsNumbersInput;
+    dates?: SettingsDateInput;
+  };
+  getFormatNumber: (style?: FormatNumberStyle) => FormatNumberOptions;
+  getFormatDate: (input?: SettingsDateInput) => SettingsDate;
+  classes: ComponentClasses;
+} & SettingsDictionary &
+  SettingsTheme;
+
+const settingsKey = Symbol();
+
+export function settings(input: SettingsInput) {
+  setContext(settingsKey, {
+    formats: {
+      numbers: internalGetFormatNumber('currency'),
+      dates: internalGetFormatDate(input?.formats?.dates),
+    },
+    getFormatNumber: internalGetFormatNumber,
+    getFormatDate: internalGetFormatDate(input?.formats?.dates),
+    classes: input.classes,
+    ...themeDefaults({ themes: input.themes, currentTheme: input.currentTheme }),
+    ...internalGetDictionary(input),
+  });
+}
+
+export function getSettings(): Settings {
+  // in a try/catch to be able to test wo svelte components
+  try {
+    return getContext<Settings>(settingsKey) ?? {};
+  } catch (error) {
+    // get default defaults and that's it.
+    return {
+      getFormatNumber: internalGetFormatNumber,
+      getFormatDate: internalGetFormatDate,
+      classes: {},
+      ...themeDefaults({}),
+      ...internalGetDictionary({}),
+    };
+  }
+}
+
+/**
+ * Theme part
+ */
+
+type SettingsThemeInput = {
   themes?: {
     light?: string[];
     dark?: string[];
@@ -36,104 +78,177 @@ export type SettingsInput = {
   currentTheme?: ThemeStore;
 };
 
-export type Settings = SettingsInput & { currentTheme: ThemeStore };
+type SettingsTheme = {
+  themes: {
+    light: string[];
+    dark: string[];
+  };
+  currentTheme: ThemeStore;
+};
 
-const settingsKey = Symbol();
-
-export function settings(settings: SettingsInput) {
-  let lightThemes = settings.themes?.light ?? ['light'];
-  let darkThemes = settings.themes?.dark ?? ['dark'];
+function themeDefaults(input: SettingsThemeInput): SettingsTheme {
+  let lightThemes = input.themes?.light ?? ['light'];
+  let darkThemes = input.themes?.dark ?? ['dark'];
 
   let currentTheme =
     // In some cases, `settings` is called again from inside a component. Don't create a new theme store in this case.
-    settings.currentTheme ??
+    input.currentTheme ??
     createThemeStore({
       light: lightThemes,
       dark: darkThemes,
     });
 
-  setContext(settingsKey, {
-    ...settings,
+  return {
     themes: {
       light: lightThemes,
       dark: darkThemes,
     },
     currentTheme,
-  });
+  };
 }
 
-function defaults() {}
+/**
+ * Number part
+ */
 
-export function getSettings(): Settings {
-  // in a try/catch to be able to test wo svelte components
-  try {
-    const tt = getContext<Settings>(settingsKey) ?? {};
-    console.log(`tt`, tt);
-    return tt;
-  } catch (error) {
-    return { currentTheme: createThemeStore({ light: ['light'], dark: ['dark'] }) };
-  }
-}
+type SettingsNumbersInput = {
+  defaults?: FormatNumberOptions;
+} & {
+  [key in ExcludeNone<FormatNumberStyle>]?: FormatNumberOptions;
+};
 
-export function getFormatNumber(style?: FormatNumberStyle) {
-  let toRet = {
-    locales: 'en',
-    currency: 'USD',
-    fractionDigits: 2,
-    currencyDisplay: 'symbol',
+type SettingsNumbers = {
+  defaults: FormatNumberOptions;
+} & {
+  [key in ExcludeNone<FormatNumberStyle>]?: FormatNumberOptions;
+};
+
+function numbersDefaults(input: SettingsNumbersInput): SettingsNumbers {
+  let toRet: SettingsNumbers = {
+    defaults: {
+      locales: 'en',
+      currency: 'USD',
+      fractionDigits: 2,
+      currencyDisplay: 'symbol',
+    },
   };
 
-  const settings = getSettings();
-  toRet = { ...toRet, ...(settings.formats?.numbers?.defaults ?? {}) };
-
-  if (style && style !== 'none') {
-    toRet = { ...toRet, ...(settings.formats?.numbers?.[style] ?? {}) };
-  }
+  //TODO?
 
   return toRet;
 }
 
-export function getFormatDate(options?: FormatDateOptions) {
-  // if custom is set && variant is not set, let's put custom as variant
-  const variant: FormatDateOptions['variant'] =
-    options?.custom && options?.variant === undefined ? 'custom' : options?.variant ?? 'default';
+function internalGetFormatNumber(style?: FormatNumberStyle): FormatNumberOptions {
+  return numbersDefaults({})['defaults'];
 
-  const settings = getSettings();
+  // TODO?
 
-  const baseParsing = options?.baseParsing ?? settings.formats?.dates?.baseParsing ?? 'yyyy-MM-dd';
+  // toRet = { ...toRet, ...(settings.formats?.numbers?.defaults ?? {}) };
 
-  const custom = options?.custom ?? '';
+  // if (style && style !== 'none') {
+  //   toRet = { ...toRet, ...(settings.formats?.numbers?.[style] ?? {}) };
+  // }
+}
 
-  const locales = options?.locales ?? settings.formats?.dates?.locales ?? 'en';
+/**
+ * Dictionary part
+ */
 
-  let toRet: {
-    locales: string;
-    baseParsing: string;
-    weekStartsOn: DayOfWeek;
-    variant: DateFormatVariant;
-    custom: CustomIntlDateTimeFormatOptions;
-    presets: {
-      day: Record<DateFormatVariant, CustomIntlDateTimeFormatOptions>;
-      dayTime: Record<DateFormatVariant, CustomIntlDateTimeFormatOptions>;
-      timeOnly: Record<DateFormatVariant, CustomIntlDateTimeFormatOptions>;
-      week: Record<DateFormatVariant, CustomIntlDateTimeFormatOptions>;
-      month: Record<DateFormatVariant, CustomIntlDateTimeFormatOptions>;
-      monthYear: Record<DateFormatVariant, CustomIntlDateTimeFormatOptions>;
-      year: Record<DateFormatVariant, CustomIntlDateTimeFormatOptions>;
+export type SettingsDictionaryInput = {
+  dictionary?: {
+    Ok?: string;
+    Cancel?: string;
+
+    Date?: {
+      Day?: string;
+      Week?: string;
+      BiWeek?: string;
+      Month?: string;
+      Quarter?: string;
+      CalendarYear?: string;
+      FiscalYearOct?: string;
     };
-    ordinalSuffixes: Record<string, OrdinalSuffixes>;
-    dictionaryDate: DictionaryMessages['Date'];
-  } = {
-    locales,
-    baseParsing,
-    weekStartsOn:
-      options?.weekStartsOn ??
-      settings.formats?.dates?.weekStartsOn ??
-      getWeekStartsOnFromIntl(locales),
-    variant,
-    custom,
+  };
+};
 
-    // keep always the en fallback
+type DeepRequired<T> = Required<{
+  [K in keyof T]: T[K] extends Required<T[K]> ? Required<T[K]> : DeepRequired<T[K]>;
+}>;
+
+export type SettingsDictionary = DeepRequired<SettingsDictionaryInput>;
+
+function dictionaryDefaults(): SettingsDictionary {
+  return {
+    dictionary: {
+      Ok: 'Ok',
+      Cancel: 'Cancel',
+
+      Date: {
+        Day: 'Day',
+        Week: 'Week',
+        BiWeek: 'Bi-Week',
+        Month: 'Month',
+        Quarter: 'Quarter',
+        CalendarYear: 'Calendar Year',
+        FiscalYearOct: 'Fiscal Year (Oct)',
+      },
+    },
+  };
+}
+
+function internalGetDictionary(input: SettingsDictionaryInput) {
+  // if custom is set && variant is not set, let's put custom as variant
+  const def = dictionaryDefaults();
+
+  let toRet: SettingsDictionary = {
+    dictionary: {
+      Ok: input?.dictionary?.Ok ?? def.dictionary.Ok,
+      Cancel: input?.dictionary?.Cancel ?? def.dictionary.Cancel,
+
+      Date: {
+        Day: input?.dictionary?.Date?.Day ?? def.dictionary.Date.Day,
+        Week: input?.dictionary?.Date?.Week ?? def.dictionary.Date.Week,
+        BiWeek: input?.dictionary?.Date?.BiWeek ?? def.dictionary.Date.BiWeek,
+        Month: input?.dictionary?.Date?.Month ?? def.dictionary.Date.Month,
+        Quarter: input?.dictionary?.Date?.Quarter ?? def.dictionary.Date.Quarter,
+        CalendarYear: input?.dictionary?.Date?.CalendarYear ?? def.dictionary.Date.CalendarYear,
+        FiscalYearOct: input?.dictionary?.Date?.FiscalYearOct ?? def.dictionary.Date.FiscalYearOct,
+      },
+    },
+  };
+
+  return toRet;
+}
+
+type SettingsDate = {
+  locales: string;
+  baseParsing: string;
+  weekStartsOn: DayOfWeek;
+  variant: DateFormatVariant;
+  custom: CustomIntlDateTimeFormatOptions;
+  presets: {
+    day: Record<DateFormatVariant, CustomIntlDateTimeFormatOptions>;
+    dayTime: Record<DateFormatVariant, CustomIntlDateTimeFormatOptions>;
+    timeOnly: Record<DateFormatVariant, CustomIntlDateTimeFormatOptions>;
+    week: Record<DateFormatVariant, CustomIntlDateTimeFormatOptions>;
+    month: Record<DateFormatVariant, CustomIntlDateTimeFormatOptions>;
+    monthYear: Record<DateFormatVariant, CustomIntlDateTimeFormatOptions>;
+    year: Record<DateFormatVariant, CustomIntlDateTimeFormatOptions>;
+  };
+  ordinalSuffixes: Record<string, OrdinalSuffixes>;
+  dictionaryDate: SettingsDictionary['dictionary']['Date'];
+};
+
+function dateDefaults(localesInput?: string): SettingsDate {
+  const locales = localesInput ?? 'en';
+
+  const custom = '';
+  return {
+    baseParsing: 'yyyy-MM-dd',
+    custom: '',
+    locales,
+    weekStartsOn: getWeekStartsOnFromIntl(locales) ?? DayOfWeek.Sunday,
+    variant: 'default',
     ordinalSuffixes: {
       en: {
         one: 'st',
@@ -141,180 +256,160 @@ export function getFormatDate(options?: FormatDateOptions) {
         few: 'rd',
         other: 'th',
       },
-      ...settings.formats?.dates?.ordinalSuffixes,
-      ...options?.ordinalSuffixes,
     },
-
+    dictionaryDate: internalGetDictionary({}).dictionary.Date,
     presets: {
       day: {
-        short: options?.presets?.day?.short ??
-          settings.formats?.dates?.presets?.day?.short ?? [
-            DateToken.DayOfMonth_numeric,
-            DateToken.Month_numeric,
-          ],
-        default: options?.presets?.day?.default ??
-          settings.formats?.dates?.presets?.day?.default ?? [
-            DateToken.DayOfMonth_numeric,
-            DateToken.Month_numeric,
-            DateToken.Year_numeric,
-          ],
-        long: options?.presets?.day?.long ??
-          settings.formats?.dates?.presets?.day?.long ?? [
-            DateToken.DayOfMonth_numeric,
-            DateToken.Month_short,
-            DateToken.Year_numeric,
-          ],
+        short: [DateToken.DayOfMonth_numeric, DateToken.Month_numeric],
+        default: [DateToken.DayOfMonth_numeric, DateToken.Month_numeric, DateToken.Year_numeric],
+        long: [DateToken.DayOfMonth_numeric, DateToken.Month_short, DateToken.Year_numeric],
         custom,
       },
+
       dayTime: {
-        short: options?.presets?.dayTime?.short ??
-          settings.formats?.dates?.presets?.dayTime?.short ?? [
-            DateToken.DayOfMonth_numeric,
-            DateToken.Month_numeric,
-            DateToken.Year_numeric,
-            DateToken.Hour_numeric,
-            DateToken.Minute_numeric,
-          ],
-        default: options?.presets?.dayTime?.default ??
-          settings.formats?.dates?.presets?.dayTime?.default ?? [
-            DateToken.DayOfMonth_numeric,
-            DateToken.Month_numeric,
-            DateToken.Year_numeric,
-            DateToken.Hour_2Digit,
-            DateToken.Minute_2Digit,
-          ],
-        long: options?.presets?.dayTime?.long ??
-          settings.formats?.dates?.presets?.dayTime?.long ?? [
-            DateToken.DayOfMonth_numeric,
-            DateToken.Month_numeric,
-            DateToken.Year_numeric,
-            DateToken.Hour_2Digit,
-            DateToken.Minute_2Digit,
-            DateToken.Second_2Digit,
-          ],
+        short: [
+          DateToken.DayOfMonth_numeric,
+          DateToken.Month_numeric,
+          DateToken.Year_numeric,
+          DateToken.Hour_numeric,
+          DateToken.Minute_numeric,
+        ],
+        default: [
+          DateToken.DayOfMonth_numeric,
+          DateToken.Month_numeric,
+          DateToken.Year_numeric,
+          DateToken.Hour_2Digit,
+          DateToken.Minute_2Digit,
+        ],
+        long: [
+          DateToken.DayOfMonth_numeric,
+          DateToken.Month_numeric,
+          DateToken.Year_numeric,
+          DateToken.Hour_2Digit,
+          DateToken.Minute_2Digit,
+          DateToken.Second_2Digit,
+        ],
         custom,
       },
 
       timeOnly: {
-        short: options?.presets?.timeOnly?.short ??
-          settings.formats?.dates?.presets?.timeOnly?.short ?? [
-            DateToken.Hour_numeric,
-            DateToken.Minute_numeric,
-          ],
-        default: options?.presets?.timeOnly?.default ??
-          settings.formats?.dates?.presets?.timeOnly?.default ?? [
-            DateToken.Hour_2Digit,
-            DateToken.Minute_2Digit,
-            DateToken.Second_2Digit,
-          ],
-        long: options?.presets?.timeOnly?.long ??
-          settings.formats?.dates?.presets?.timeOnly?.long ?? [
-            DateToken.Hour_2Digit,
-            DateToken.Minute_2Digit,
-            DateToken.Second_2Digit,
-            DateToken.MiliSecond_3,
-          ],
+        short: [DateToken.Hour_numeric, DateToken.Minute_numeric],
+        default: [DateToken.Hour_2Digit, DateToken.Minute_2Digit, DateToken.Second_2Digit],
+        long: [
+          DateToken.Hour_2Digit,
+          DateToken.Minute_2Digit,
+          DateToken.Second_2Digit,
+          DateToken.MiliSecond_3,
+        ],
         custom,
       },
 
       week: {
-        short: options?.presets?.week?.short ??
-          settings.formats?.dates?.presets?.week?.short ?? [
-            DateToken.DayOfMonth_numeric,
-            DateToken.Month_numeric,
-          ],
-        default: options?.presets?.week?.default ??
-          settings.formats?.dates?.presets?.week?.default ?? [
-            DateToken.DayOfMonth_numeric,
-            DateToken.Month_numeric,
-            DateToken.Year_numeric,
-          ],
-        long: options?.presets?.week?.long ??
-          settings.formats?.dates?.presets?.week?.long ?? [
-            DateToken.DayOfMonth_numeric,
-            DateToken.Month_numeric,
-            DateToken.Year_numeric,
-          ],
+        short: [DateToken.DayOfMonth_numeric, DateToken.Month_numeric],
+        default: [DateToken.DayOfMonth_numeric, DateToken.Month_numeric, DateToken.Year_numeric],
+        long: [DateToken.DayOfMonth_numeric, DateToken.Month_numeric, DateToken.Year_numeric],
+        custom,
+      },
+
+      month: {
+        short: DateToken.Month_short,
+        default: DateToken.Month_short,
+        long: DateToken.Month_long,
+        custom,
+      },
+
+      monthYear: {
+        short: [DateToken.Month_short, DateToken.Year_2Digit],
+        default: [DateToken.Month_long, DateToken.Year_numeric],
+        long: [DateToken.Month_long, DateToken.Year_numeric],
+        custom,
+      },
+
+      year: {
+        short: DateToken.Year_2Digit,
+        default: DateToken.Year_numeric,
+        long: DateToken.Year_numeric,
+        custom,
+      },
+    },
+  };
+}
+
+function internalGetFormatDate(input?: SettingsDateInput): SettingsDate {
+  // if custom is set && variant is not set, let's put custom as variant
+  const variant: SettingsDateInput['variant'] =
+    input?.custom && input?.variant === undefined ? 'custom' : input?.variant ?? 'default';
+
+  const def = dateDefaults(input?.locales);
+
+  const baseParsing = input?.baseParsing ?? def.baseParsing;
+
+  const custom = input?.custom ?? '';
+
+  // const locales = input?.locales ?? def.locales;
+
+  let toRet: SettingsDate = {
+    locales: def.locales,
+    baseParsing,
+    weekStartsOn: input?.weekStartsOn ?? def.weekStartsOn ?? getWeekStartsOnFromIntl(def.locales),
+    variant,
+    custom,
+
+    // keep always the en fallback
+    ordinalSuffixes: {
+      ...def.ordinalSuffixes,
+      ...input?.ordinalSuffixes,
+    },
+
+    presets: {
+      day: {
+        short: input?.presets?.day?.short ?? def.presets.day.short,
+        default: input?.presets?.day?.default ?? def.presets.day.default,
+        long: input?.presets?.day?.long ?? def.presets.day.long,
+        custom,
+      },
+      dayTime: {
+        short: input?.presets?.dayTime?.short ?? def.presets.dayTime.short,
+        default: input?.presets?.dayTime?.default ?? def.presets.dayTime.default,
+        long: input?.presets?.dayTime?.long ?? def.presets.dayTime.long,
+        custom,
+      },
+
+      timeOnly: {
+        short: input?.presets?.timeOnly?.short ?? def.presets.timeOnly.short,
+        default: input?.presets?.timeOnly?.default ?? def.presets.timeOnly.default,
+        long: input?.presets?.timeOnly?.long ?? def.presets.timeOnly.long,
+        custom,
+      },
+
+      week: {
+        short: input?.presets?.week?.short ?? def.presets.week.short,
+        default: input?.presets?.week?.default ?? def.presets.week.default,
+        long: input?.presets?.week?.long ?? def.presets.week.long,
         custom,
       },
       month: {
-        short:
-          options?.presets?.month?.short ??
-          settings.formats?.dates?.presets?.month?.short ??
-          DateToken.Month_short,
-        default:
-          options?.presets?.month?.default ??
-          settings.formats?.dates?.presets?.month?.default ??
-          DateToken.Month_short,
-        long:
-          options?.presets?.month?.long ??
-          settings.formats?.dates?.presets?.month?.long ??
-          DateToken.Month_long,
+        short: input?.presets?.month?.short ?? def.presets.month.short,
+        default: input?.presets?.month?.default ?? def.presets.month.default,
+        long: input?.presets?.month?.long ?? def.presets.month.long,
         custom,
       },
       monthYear: {
-        short: options?.presets?.monthsYear?.short ??
-          settings.formats?.dates?.presets?.monthsYear?.short ?? [
-            DateToken.Month_short,
-            DateToken.Year_2Digit,
-          ],
-        default: options?.presets?.monthsYear?.default ??
-          settings.formats?.dates?.presets?.monthsYear?.default ?? [
-            DateToken.Month_long,
-            DateToken.Year_numeric,
-          ],
-        long: options?.presets?.monthsYear?.long ??
-          settings.formats?.dates?.presets?.monthsYear?.long ?? [
-            DateToken.Month_long,
-            DateToken.Year_numeric,
-          ],
+        short: input?.presets?.monthsYear?.short ?? def.presets.monthYear.short,
+        default: input?.presets?.monthsYear?.default ?? def.presets.monthYear.default,
+        long: input?.presets?.monthsYear?.long ?? def.presets.monthYear.long,
         custom,
       },
       year: {
-        short:
-          options?.presets?.year?.short ??
-          settings.formats?.dates?.presets?.year?.short ??
-          DateToken.Year_2Digit,
-        default:
-          options?.presets?.year?.default ??
-          settings.formats?.dates?.presets?.year?.default ??
-          DateToken.Year_numeric,
-        long:
-          options?.presets?.year?.long ??
-          settings.formats?.dates?.presets?.year?.long ??
-          DateToken.Year_numeric,
+        short: input?.presets?.year?.short ?? def.presets.year.short,
+        default: input?.presets?.year?.default ?? def.presets.year.default,
+        long: input?.presets?.year?.long ?? def.presets.year.long,
         custom,
       },
     },
 
     // dico
-    dictionaryDate: getDictionary().Date,
-  };
-
-  return toRet;
-}
-
-export function getDictionary(options?: DictionaryMessagesOptions) {
-  // if custom is set && variant is not set, let's put custom as variant
-  const settings = getSettings();
-
-  let toRet: DictionaryMessages = {
-    Ok: options?.Ok ?? settings.dictionary?.Ok ?? 'Ok',
-    Cancel: options?.Cancel ?? settings.dictionary?.Cancel ?? 'Cancel',
-
-    Date: {
-      Day: options?.Date?.Day ?? settings.dictionary?.Date?.Day ?? 'Day',
-      Week: options?.Date?.Week ?? settings.dictionary?.Date?.Week ?? 'Week',
-      BiWeek: options?.Date?.BiWeek ?? settings.dictionary?.Date?.BiWeek ?? 'Bi-Week',
-      Month: options?.Date?.Month ?? settings.dictionary?.Date?.Month ?? 'Month',
-      Quarter: options?.Date?.Quarter ?? settings.dictionary?.Date?.Quarter ?? 'Quarter',
-      CalendarYear:
-        options?.Date?.CalendarYear ?? settings.dictionary?.Date?.CalendarYear ?? 'Calendar Year',
-      FiscalYearOct:
-        options?.Date?.FiscalYearOct ??
-        settings.dictionary?.Date?.FiscalYearOct ??
-        'Fiscal Year (Oct)',
-    },
+    dictionaryDate: internalGetDictionary({}).dictionary.Date,
   };
 
   return toRet;

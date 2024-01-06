@@ -8,7 +8,7 @@ import {
   DayOfWeek,
   formatIntl,
   type CustomIntlDateTimeFormatOptions,
-  type FormatDateOptions,
+  type SettingsDateInput,
   DateToken,
   getWeekStartsOnFromIntl,
 } from './date';
@@ -22,7 +22,7 @@ const dt_1M_1d = new Date(2023, 2, 7);
 const dt_1M_1d_time_pm = new Date(2023, 2, 7, 14, 2, 3, 4);
 const dt_1M_1d_time_am = new Date(2023, 2, 7, 1, 2, 3, 4);
 
-const fr: FormatDateOptions = {
+const fr: SettingsDateInput = {
   locales: 'fr',
   ordinalSuffixes: {
     fr: {
@@ -78,7 +78,7 @@ describe('formatDate()', () => {
   });
 
   describe('should format date string for DayTime, TimeOnly', () => {
-    const combi: [Date, PeriodType, FormatDateOptions, string[]][] = [
+    const combi: [Date, PeriodType, SettingsDateInput, string[]][] = [
       [
         dt_1M_1d_time_pm,
         PeriodType.DayTime,

@@ -33,7 +33,7 @@ import {
 import { hasKeyOf } from '../types/typeGuards';
 import { chunk } from './array';
 import type { DateRange } from './dateRange';
-import { getFormatDate } from '$lib/components/settings';
+import { getSettings } from '$lib/components/settings';
 
 export type SelectedDate = Date | Date[] | DateRange | null;
 
@@ -112,8 +112,8 @@ export function getWeekStartsOnFromIntl(locales?: string): DayOfWeek {
   return (info.weekInfo.firstDay ?? 0) % 7; // (in Intl, sunday is 7 not 0, so we need to mod 7)
 }
 
-export function getPeriodTypeName(periodType: PeriodType, options: FormatDateOptions = {}) {
-  const { locales, dictionaryDate: dico } = getFormatDate(options);
+export function getPeriodTypeName(periodType: PeriodType, options: SettingsDateInput = {}) {
+  const { locales, dictionaryDate: dico } = getSettings().getFormatDate(options);
 
   switch (periodType) {
     case PeriodType.Day:
@@ -642,9 +642,9 @@ export enum DateToken {
 export function formatIntl(
   dt: Date,
   tokens_or_intlOptions: CustomIntlDateTimeFormatOptions,
-  options: FormatDateOptions = {}
+  options: SettingsDateInput = {}
 ) {
-  const { locales, ordinalSuffixes } = getFormatDate(options);
+  const { locales, ordinalSuffixes } = getSettings().getFormatDate(options);
 
   function formatIntlOrdinal(formatter: Intl.DateTimeFormat, with_ordinal = false) {
     if (with_ordinal) {
@@ -742,7 +742,7 @@ export function formatIntl(
 function range(
   date: Date,
   weekStartsOn: DayOfWeek,
-  options: FormatDateOptions,
+  options: SettingsDateInput,
   formats: Record<DateFormatVariant, CustomIntlDateTimeFormatOptions>,
   variant: DateFormatVariant,
   biWeek: undefined | 1 | 2 = undefined // undefined means that it's not a bi-week
@@ -779,7 +779,7 @@ export type CustomIntlDateTimeFormatOptions =
   | string
   | string[]
   | (Intl.DateTimeFormatOptions & { withOrdinal?: boolean });
-export type FormatDateOptions = {
+export type SettingsDateInput = {
   locales?: string | undefined;
   baseParsing?: string;
   /** will be inferred from your locales */
@@ -801,7 +801,7 @@ export type FormatDateOptions = {
 export function formatDate(
   date: Date | string | null | undefined,
   periodType?: PeriodType | null | undefined,
-  options: FormatDateOptions = {}
+  options: SettingsDateInput = {}
 ): string {
   periodType = periodType ?? undefined;
 
@@ -815,7 +815,7 @@ export function formatDate(
     return '';
   }
 
-  const { variant, weekStartsOn, custom, presets } = getFormatDate(options);
+  const { variant, weekStartsOn, custom, presets } = getSettings().getFormatDate(options);
   const { day, dayTime, timeOnly, week, month, monthYear, year } = presets;
 
   if (periodType === PeriodType.Week) {
