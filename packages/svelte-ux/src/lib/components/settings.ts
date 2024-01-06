@@ -24,10 +24,6 @@ export type SettingsInput = {
   SettingsThemeInput;
 
 export type Settings = {
-  formats?: {
-    numbers?: SettingsNumbersInput;
-    dates?: SettingsDateInput;
-  };
   getFormatNumber: (style?: FormatNumberStyle) => FormatNumberOptions;
   getFormatDate: (input?: SettingsDateInput) => SettingsDate;
   classes: ComponentClasses;
